@@ -1,0 +1,173 @@
+#+TITLE: My awesome Nix project
+#+TAGS: { fix(b) feat(f) doc(d) chore(c) } to_think(t)
+#+PROPERTY: header-args:nix :padline no
+#+PROPERTY: header-args:nix+ :comments link
+#+PROPERTY: header-args:nix+ :mkdirp t
+
+* Meta -- README
+
+#+begin_src markdown :tangle README.md
+# What
+
+This repo provides a template to help with literate programming of Nix projects.
+
+When the source blocks are interspersed with text (as is common), the nix indentation in orgmode may get a little confused which can cause garbage formatting changes. Two provided functions help integrate `nix fmt` changes back into orgmode.
+
+# Features
+
+- Write in org -- then tangle, format and detangle with one function
+- Edit a tangled file directly -- propagate changes back
+- Basic feature tags for semantic commits
+
+# Usage
+
+When working on a orgmode file, call custom functions `local-proj-tangle-format-detangle` to:
+
+1. Tangle all src blocks
+2. Call `nix fmt` to apply formatter from the flake
+3. Detangle all sources back into orgmode file to fix formatting
+
+Alternatively, when a `.nix` file was edited directly -- call `local-proj-detangle-all` in orgmode to detangle all changes back.
+
+## Using as before-save-hook
+
+It's possible to use similar functions as a pre-save hook (see caveats for, well, caveats). `.dir-locals.el` for this:
+
+```elisp
+((org-mode
+   (eval add-hook 'before-save-hook (lambda ()(org-babel-tangle)) t t)
+   ;; Run nix fmt before save
+   (eval add-hook 'before-save-hook (lambda ()(shell-command "nix fmt")) t t)
+   (eval add-hook 'before-save-hook
+         (lambda ()
+           (let ((previous-value org-src-window-setup))
+             ;; temporarily break org-src-window-setup, otherwise detangle creates unneeded frames
+             (setq org-src-window-setup 'nil)
+
+             (mapcar #'org-babel-detangle (directory-files-recursively "." ".*\.nix"))
+             ;; revert org-src-window-setup
+             (setq org-src-window-setup previous-value))) t t)))
+```
+
+# Example
+
+See [project.org](./project.org) for the sample org mode file.
+
+
+# Alternatives
+
+- [org-tanglesync.el](https://gitlab.com/mtekman/org-tanglesync.el)
+- `org-babel-detangle` -- note, may cause extra frames with files to appear. This is worked around in `local-proj-detangle-all`.
+
+# Caveats
+
+- The current detangle behavior does not work well if multiple headlines (even on different level) have the same text -- stuff can get **overwritten** when detangling. Workaround: change #+NAME of code block or rename the headline. Alternatively, change logic of ~org-babel-tangle-comment-format-beg~ generation.
+- It's possible to use the function from `.dir-locals.el` as a before-save hook but if the number of src blocks is >40(empricial number), it will noticeably slow down the save process
+- When detangling -- the cursor loses its position and jumps to the beginning of SRC block.
+#+end_src
+
+
+* Flake
+:PROPERTIES:
+:header-args:nix+: :tangle flake.nix
+:END:
+
+I tend to use ~flake-parts~ as the basis for my flakes with once specific [[(formatter)][formatter]], nixpkgs-fmt.
+
+Flake-parts:
+- Makes exposing an overlay really easy ([[https://flake.parts/overlays.html][doc]])
+- has an interface to produce multi-system outputs that (IMO) is more clean than flake-utils ([[https://flake.parts/options/flake-parts.html#opt-perSystem][doc]])
+- Has a great collection of add-ons ([[https://flake.parts/options/flake-parts.html][doc]])
+
+** Flake intro :noexport:
+
+#+begin_src nix
+{
+  description = "Description for the project";
+#+end_src
+
+** Inputs
+
+#+begin_src nix
+  inputs = {
+    nixpkgs.url = "nixpkgs/nixos-22.11";
+    home-manager.url = "github:rycee/home-manager/release-22.11";
+    devshell.url = "github:numtide/devshell";
+  };
+#+end_src
+
+** Outputs
+
+*** Outputs intro :noexport:
+
+#+begin_src nix
+  outputs = inputs@{ flake-parts, home-manager, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+#+end_src
+
+*** Imports
+
+#+begin_src nix
+      imports =
+        [
+          inputs.devshell.flakeModule
+        ];
+#+end_src
+
+*** systems setting
+
+#+begin_src nix
+      systems = [ "x86_64-linux" "aarch64-darwin" ];
+#+end_src
+
+*** perSystem output
+
+perSystem contains the default formatter and a sample of homeManagerConfiguration. The formatter is also used in [[file:.dir-locals.el][.dirs-local.el]] in the process of "compiling" this project.
+
+#+begin_src nix
+      perSystem = { config, self', inputs', pkgs, system, ... }: {
+        # Per-system attributes can be defined here. The self' and inputs'
+        # module parameters provide easy access to attributes of the same
+        # system.
+
+        formatter = pkgs.nixpkgs-fmt; # (ref:formatter)
+        legacyPackages.homeConfigurations = {
+          user = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs;
+            modules = [ ];
+          };
+        };
+        devshells.default = {
+          env = [ ];
+          commands = [
+            {
+              help = "preview README.md";
+              name = "preview";
+              command = "${pkgs.python310Packages.grip}/bin/grip .";
+            }
+          ];
+        };
+      };
+#+end_src
+
+*** flake output
+
+#+begin_src nix
+      flake = {
+        # The usual flake attributes can be defined here, including system-
+        # agnostic ones like nixosModule and system-enumerating ones, although
+        # those are more easily expressed in perSystem.
+
+      };
+#+end_src
+
+** Flake outro :noexport:
+
+#+begin_src nix
+    };
+}
+#+end_src
+
+* Project TODOs
+
+** TODO Pre-commit hooks (at least for the tangle back and forth) :feat:

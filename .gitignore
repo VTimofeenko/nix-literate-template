@@ -1,0 +1,4 @@
+# direnv-specific, used for storing "use flake" stuff
+.direnv/
+# nix build goes here, no need to track it
+result/
