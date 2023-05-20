@@ -52,6 +52,6 @@ See [project.org](./project.org) for the sample org mode file.
 
 # Caveats
 
-- The current detangle behavior does not work well if multiple headlines (even on different level) have the same text -- stuff can get **overwritten** when detangling. Workaround: change #+NAME of code block or rename the headline. Alternatively, change logic of ~org-babel-tangle-comment-format-beg~ generation.
+- The current detangle behavior does not work well if multiple headlines (even on different level) have the same text -- stuff can get **overwritten** when detangling. Workaround: change #+NAME of code block or rename the headline. Alternatively, change logic of `org-babel-tangle-comment-format-beg` generation.
 - It's possible to use the function from `.dir-locals.el` as a before-save hook but if the number of src blocks is >40(empricial number), it will noticeably slow down the save process
 - When detangling -- the cursor loses its position and jumps to the beginning of SRC block.
