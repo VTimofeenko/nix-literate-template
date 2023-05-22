@@ -1,5 +1,5 @@
 ((org-mode . ((eval . (defun local-proj-detangle-all()
-                        "Description of your custom function."
+                        "Function that recursively detangles all .nix files."
                         ;; Your function implementation goes here
                         (interactive)
                         (let ((previous-value org-src-window-setup))
